@@ -1,0 +1,48 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Dataset files and local data
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Desktop.ini
+
+# OneDrive
+~$*
