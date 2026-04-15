@@ -1,9 +1,17 @@
+"""Configurações centrais compartilhadas pelo dashboard.
+
+Este módulo concentra caminhos, metadados do dataset, mapeamentos de
+nacionalidade e nomes amigáveis das colunas para manter a aplicação consistente
+e evitar valores literais espalhados pela base.
+"""
+
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "dados f1"
 
+# Tabelas brutas necessárias para construir a base analítica e suas colunas.
 TABELAS_F1 = {
     "results": {
         "arquivo": "results.csv",
@@ -39,6 +47,7 @@ TABELAS_F1 = {
     "status": {"arquivo": "status.csv", "colunas": ["statusId", "status"]},
 }
 
+# Colunas convertidas explicitamente para tipos numéricos na carga inicial.
 COLUNAS_NUMERICAS_BASE = [
     "grid",
     "number",
@@ -51,6 +60,7 @@ COLUNAS_NUMERICAS_BASE = [
     "alt",
 ]
 
+# Traduções de nacionalidade em inglês para país em português exibido na UI.
 NACIONALIDADE_PARA_PAIS_PT = {
     "American": "Estados Unidos",
     "American-Italian": "Estados Unidos/Itália",
@@ -98,6 +108,7 @@ NACIONALIDADE_PARA_PAIS_PT = {
     "Venezuelan": "Venezuela",
 }
 
+# Ajustes visuais globais aplicados à interface da aplicação.
 CSS_PERSONALIZADO = """
 <style>
 .block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
@@ -121,7 +132,12 @@ div[data-testid="stMetricValue"] {font-size: 1.35rem; font-weight: 700;}
 
 
 def obter_colunas() -> dict[str, str]:
-    """Retorna os nomes amigáveis usados no dashboard."""
+    """Retorna os nomes amigáveis usados na base analítica e na interface.
+
+    Returns:
+        Dicionário que padroniza os identificadores lógicos das colunas
+        utilizadas ao longo do projeto.
+    """
     return {
         "id_corrida": "ID da corrida",
         "ano": "Ano",

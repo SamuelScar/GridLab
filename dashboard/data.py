@@ -1,3 +1,10 @@
+"""Carregamento e preparação da base analítica usada no dashboard.
+
+O módulo lê apenas as tabelas e colunas necessárias do dataset de Fórmula 1,
+valida a presença dos arquivos esperados e monta um DataFrame unificado pronto
+para exploração visual.
+"""
+
 from pathlib import Path
 
 import pandas as pd
@@ -12,7 +19,15 @@ from dashboard.config import (
 
 
 def _validar_arquivos(pasta_dados: Path) -> None:
-    """Valida se os arquivos essenciais da base F1 existem na pasta esperada."""
+    """Valida a presença dos arquivos mínimos exigidos pelo dashboard.
+
+    Args:
+        pasta_dados: Diretório onde os arquivos CSV da base F1 devem existir.
+
+    Raises:
+        FileNotFoundError: Quando pelo menos um dos arquivos configurados em
+            `TABELAS_F1` não está disponível na pasta informada.
+    """
     ausentes = [
         config["arquivo"]
         for config in TABELAS_F1.values()
@@ -27,7 +42,19 @@ def _validar_arquivos(pasta_dados: Path) -> None:
 
 @st.cache_data
 def carregar_tabelas_f1(pasta_dados: Path | str) -> dict[str, pd.DataFrame]:
-    """Carrega apenas as tabelas e colunas necessárias para o dashboard inicial."""
+    """Carrega as tabelas brutas necessárias para montar a base analítica.
+
+    Args:
+        pasta_dados: Caminho para a pasta que contém os arquivos CSV do dataset.
+
+    Returns:
+        Um dicionário indexado pelo nome lógico de cada tabela, contendo os
+        DataFrames lidos com as colunas mínimas usadas pelo dashboard.
+
+    Raises:
+        FileNotFoundError: Quando a pasta de dados está incompleta.
+        pandas.errors.EmptyDataError: Quando algum CSV existe, mas está vazio.
+    """
     pasta = Path(pasta_dados)
     _validar_arquivos(pasta)
 
@@ -45,7 +72,24 @@ def carregar_tabelas_f1(pasta_dados: Path | str) -> dict[str, pd.DataFrame]:
 
 @st.cache_data
 def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
-    """Monta uma base analítica unificada com dados de corrida, piloto e equipe."""
+    """Monta a base analítica final consumida pela interface.
+
+    A transformação combina resultados de corrida com metadados de provas,
+    pilotos, equipes, circuitos e status finais. Também normaliza tipos,
+    traduz nacionalidades, cria colunas derivadas e devolve os dados já
+    ordenados para uso direto nos componentes visuais.
+
+    Args:
+        pasta_dados: Caminho da pasta que contém os CSVs originais.
+
+    Returns:
+        DataFrame consolidado com nomes de colunas amigáveis definidos em
+        `obter_colunas()`.
+
+    Raises:
+        FileNotFoundError: Quando a pasta de dados não contém todos os arquivos
+            exigidos para a consolidação.
+    """
     tabelas = carregar_tabelas_f1(pasta_dados)
     col = obter_colunas()
 

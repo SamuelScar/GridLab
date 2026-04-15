@@ -1,7 +1,14 @@
+"""Componentes visuais e agregações usadas pelo dashboard.
+
+O módulo combina pequenas rotinas de formatação, cálculos auxiliares e a
+renderização dos elementos visuais e gráficos apresentados ao usuário final.
+"""
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+# Paleta base manual para países frequentes nas visualizações.
 PAIS_COR_BASE = {
     "Estados Unidos": "#3C3B6E",
     "Itália": "#009246",
@@ -46,6 +53,7 @@ PAIS_COR_BASE = {
     "Rodésia": "#4CAF50",
 }
 
+# Conjunto de status considerados falhas mecânicas para fins analíticos.
 MECHANICAL_FAILURE_STATUSES = {
     "Engine",
     "Gearbox",
@@ -98,7 +106,15 @@ MECHANICAL_FAILURE_STATUSES = {
 
 
 def _mapear_cores_paises(paises: list[str]) -> dict[str, str]:
-    """Retorna mapa de cores por país com fallback para países não mapeados."""
+    """Mapeia países para cores consistentes nas visualizações.
+
+    Args:
+        paises: Lista de países na ordem em que aparecem no gráfico.
+
+    Returns:
+        Dicionário de país para cor hexadecimal, usando a paleta base sempre
+        que disponível e uma paleta Plotly como fallback.
+    """
     fallback = (
         px.colors.qualitative.Safe
         + px.colors.qualitative.Bold
@@ -116,21 +132,44 @@ def _mapear_cores_paises(paises: list[str]) -> dict[str, str]:
 
 
 def media_formatada(valor: float, sufixo: str = "") -> str:
-    """Formata médias numéricas para exibição nos KPIs."""
+    """Formata médias numéricas para exibição textual.
+
+    Args:
+        valor: Valor numérico que será exibido.
+        sufixo: Texto opcional concatenado ao final do número formatado.
+
+    Returns:
+        String formatada com duas casas decimais ou `N/A` para valores ausentes.
+    """
     if pd.isna(valor):
         return "N/A"
     return f"{valor:.2f}{sufixo}"
 
 
 def percentual_formatado(valor: float) -> str:
-    """Formata valores percentuais para exibição."""
+    """Formata um valor percentual para exibição.
+
+    Args:
+        valor: Valor percentual em escala de 0 a 100.
+
+    Returns:
+        String formatada com uma casa decimal ou `N/A` para valores ausentes.
+    """
     if pd.isna(valor):
         return "N/A"
     return f"{valor:.1f}%"
 
 
 def ajustar_figura(fig):
-    """Aplica padrão visual e espaçamento dos gráficos Plotly."""
+    """Aplica o padrão visual compartilhado aos gráficos Plotly.
+
+    Args:
+        fig: Figura Plotly já construída.
+
+    Returns:
+        A própria figura recebida, após aplicar layout, altura e margens
+        padronizadas para o dashboard.
+    """
     fig.update_layout(
         template="plotly_white",
         height=380,
@@ -141,12 +180,17 @@ def ajustar_figura(fig):
 
 
 def render_cabecalho() -> None:
-    """Renderiza título e descrição curta da página."""
+    """Renderiza o título principal da aplicação."""
     st.title("Dashboard F1: Insights de Corrida e Performance")
 
 
 def render_kpis(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Exibe os indicadores principais no topo da página."""
+    """Exibe os indicadores principais com base no recorte atual.
+
+    Args:
+        df_filtrado: Base já filtrada conforme a seleção do usuário.
+        col: Mapeamento de nomes amigáveis das colunas.
+    """
     st.markdown("### Indicadores principais")
     kpi1, kpi2, kpi3, kpi4 = st.columns(4, gap="medium")
 
@@ -174,7 +218,16 @@ def render_kpis(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
 def _falha_mecanica_por_nacionalidade(
     df_filtrado: pd.DataFrame, col: dict[str, str]
 ) -> pd.DataFrame:
-    """Calcula taxa de falha mecânica por país do piloto."""
+    """Resume a incidência de falhas mecânicas por país do piloto.
+
+    Args:
+        df_filtrado: Base analítica após aplicação dos filtros.
+        col: Mapeamento de nomes amigáveis das colunas.
+
+    Returns:
+        DataFrame agregado com participações, falhas mecânicas e taxa de falha
+        por país, já limitado ao top 10 com amostra mínima.
+    """
     dados = df_filtrado.dropna(
         subset=[col["nac_piloto"], col["status"]]
     )
@@ -204,7 +257,16 @@ def _falha_mecanica_por_nacionalidade(
 def _pilotos_maior_recuperacao(
     df_filtrado: pd.DataFrame, col: dict[str, str]
 ) -> pd.DataFrame:
-    """Mostra pilotos que mais recuperam posições saindo de trás no grid."""
+    """Identifica pilotos que mais ganham posições ao longo da corrida.
+
+    Args:
+        df_filtrado: Base analítica após aplicação dos filtros.
+        col: Mapeamento de nomes amigáveis das colunas.
+
+    Returns:
+        DataFrame agregado por piloto com média de posições ganhas, taxa de
+        abandono e filtro por amostra mínima.
+    """
     dados = df_filtrado[df_filtrado[col["grid"]].between(1, 20)].dropna(
         subset=[col["piloto"], col["ganho"], col["abandono"]]
     )
@@ -228,7 +290,16 @@ def _pilotos_maior_recuperacao(
 def _desempenho_por_faixa_grid(
     df_filtrado: pd.DataFrame, col: dict[str, str]
 ) -> pd.DataFrame:
-    """Calcula chance de pódio e de pontuar por faixa de posição de largada."""
+    """Calcula desempenho médio por faixa de posição de largada.
+
+    Args:
+        df_filtrado: Base analítica após aplicação dos filtros.
+        col: Mapeamento de nomes amigáveis das colunas.
+
+    Returns:
+        DataFrame com amostra, taxa de pódio e taxa de pontuação por faixa de
+        grid, considerando apenas largadas válidas entre 1 e 20.
+    """
     dados = df_filtrado[df_filtrado[col["grid"]].between(1, 20)].dropna(
         subset=[col["grid"], col["chegada"], col["pontos"]]
     )
@@ -256,7 +327,16 @@ def _desempenho_por_faixa_grid(
 
 
 def _numero_da_sorte(df_filtrado: pd.DataFrame, col: dict[str, str]) -> pd.DataFrame:
-    """Resume desempenho por número do piloto para análise do 'número da sorte'."""
+    """Resume o desempenho histórico associado a cada número de piloto.
+
+    Args:
+        df_filtrado: Base analítica após aplicação dos filtros.
+        col: Mapeamento de nomes amigáveis das colunas.
+
+    Returns:
+        DataFrame agregado por número do piloto com volume de corridas,
+        vitórias, pontos e métricas percentuais usadas no gráfico temático.
+    """
     dados = df_filtrado.dropna(
         subset=[col["numero_piloto"], col["chegada"], col["pontos"]]
     ).copy()
@@ -294,7 +374,16 @@ def _numero_da_sorte(df_filtrado: pd.DataFrame, col: dict[str, str]) -> pd.DataF
 def _abandono_por_tamanho_prova(
     df_filtrado: pd.DataFrame, col: dict[str, str]
 ) -> pd.DataFrame:
-    """Agrupa corridas por quantidade de voltas para medir relação com abandono."""
+    """Mede abandono e ganho médio por tamanho da prova.
+
+    Args:
+        df_filtrado: Base analítica após aplicação dos filtros.
+        col: Mapeamento de nomes amigáveis das colunas.
+
+    Returns:
+        DataFrame resumido por faixa de quantidade de voltas, já com taxa de
+        abandono e média de posições ganhas.
+    """
     dados = df_filtrado.dropna(
         subset=[col["id_corrida"], col["voltas"], col["abandono"], col["ganho"]]
     ).copy()
@@ -332,7 +421,18 @@ def _abandono_por_tamanho_prova(
 
 
 def render_graficos(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Renderiza quatro gráficos simples e diretos para leitura geral."""
+    """Renderiza o conjunto principal de gráficos do dashboard.
+
+    Os quatro gráficos cobrem:
+    - falhas mecânicas por país;
+    - recuperação média de posições por piloto;
+    - desempenho por número do piloto;
+    - abandono por faixa de tamanho da corrida.
+
+    Args:
+        df_filtrado: Base já filtrada conforme a seleção do usuário.
+        col: Mapeamento de nomes amigáveis das colunas.
+    """
     st.markdown("### Gráficos principais")
 
     row1_col1, row1_col2 = st.columns(2, gap="large")
@@ -467,7 +567,12 @@ def render_graficos(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
 
 
 def render_relacionamento_dinamico(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Renderiza tabela dinâmica para explorar relações entre variáveis da F1."""
+    """Renderiza uma tabela resumo configurável pelo usuário.
+
+    Args:
+        df_filtrado: Base já filtrada conforme a seleção do usuário.
+        col: Mapeamento de nomes amigáveis das colunas.
+    """
     st.markdown("### Relacionamento dinâmico")
     st.caption(
         "Resumo personalizado: escolha uma coluna para agrupar e outra para calcular."
@@ -527,7 +632,12 @@ def render_relacionamento_dinamico(df_filtrado: pd.DataFrame, col: dict[str, str
 
 
 def render_dados_filtrados(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Mostra a tabela final com os registros após aplicação dos filtros."""
+    """Exibe a tabela detalhada de resultados do recorte atual.
+
+    Args:
+        df_filtrado: Base já filtrada conforme a seleção do usuário.
+        col: Mapeamento de nomes amigáveis das colunas.
+    """
     st.divider()
     colunas_exibicao = [
         col["ano"],

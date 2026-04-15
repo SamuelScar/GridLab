@@ -1,3 +1,9 @@
+"""Orquestra o fluxo principal do Dashboard F1: Insights de Corrida.
+
+O módulo conecta as etapas de configuração visual, carregamento da base
+analítica, construção dos filtros e renderização das abas do dashboard.
+"""
+
 import streamlit as st
 
 from dashboard.components import (
@@ -13,7 +19,11 @@ from dashboard.filters import aplicar_filtros, construir_filtros
 
 
 def configurar_pagina() -> None:
-    """Define configuração inicial e estilo visual da aplicação."""
+    """Aplica as configurações globais da página da aplicação.
+
+    Define metadados da aba do navegador e injeta o CSS compartilhado para
+    manter o padrão visual entre todos os componentes renderizados.
+    """
     st.set_page_config(
         page_title="Dashboard F1: Insights de Corrida",
         page_icon=":bar_chart:",
@@ -23,7 +33,15 @@ def configurar_pagina() -> None:
 
 
 def main() -> None:
-    """Executa o fluxo principal da aplicação Streamlit."""
+    """Executa o fluxo principal da aplicação.
+
+    O fluxo segue quatro etapas:
+    1. configurar a página e o cabeçalho;
+    2. carregar a base analítica consolidada;
+    3. coletar e aplicar os filtros escolhidos na sidebar;
+    4. renderizar as abas principais do dashboard.
+
+    """
     configurar_pagina()
     render_cabecalho()
 

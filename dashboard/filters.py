@@ -1,3 +1,9 @@
+"""Construção e aplicação dos filtros exibidos na sidebar.
+
+O módulo concentra a lógica de interface e filtragem para manter o restante da
+aplicação focado em visualização e transformação de dados.
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -9,7 +15,18 @@ def _filtro_opcional_multiselect(
     opcoes: list[str],
     chave: str,
 ) -> list[str] | None:
-    """Renderiza um filtro opcional com toggle claro de ativação."""
+    """Renderiza um filtro multiselect que pode ser ligado ou desligado.
+
+    Args:
+        rotulo_toggle: Texto do controle que ativa ou desativa o filtro.
+        rotulo_select: Texto exibido acima do campo multiselect.
+        opcoes: Valores disponíveis para seleção.
+        chave: Prefixo usado nas chaves de estado da interface.
+
+    Returns:
+        `None` quando o filtro está desativado; caso contrário, a lista de
+        valores selecionados, que pode estar vazia.
+    """
     ativo = st.toggle(rotulo_toggle, value=False, key=f"{chave}_ativo")
     if not ativo:
         return None
@@ -24,7 +41,17 @@ def _filtro_opcional_multiselect(
 
 
 def construir_filtros(df: pd.DataFrame, col: dict[str, str]) -> dict[str, object]:
-    """Renderiza a sidebar e retorna os filtros escolhidos pelo usuário."""
+    """Renderiza a sidebar e coleta os filtros selecionados pelo usuário.
+
+    Args:
+        df: Base analítica completa usada para gerar opções e limites.
+        col: Mapeamento entre identificadores internos e nomes amigáveis das
+            colunas do dashboard.
+
+    Returns:
+        Dicionário serializável com o estado atual de todos os filtros da
+        interface, pronto para ser consumido por `aplicar_filtros`.
+    """
     with st.sidebar:
         st.title("Filtros")
         st.markdown(
@@ -110,7 +137,22 @@ def construir_filtros(df: pd.DataFrame, col: dict[str, str]) -> dict[str, object
 def aplicar_filtros(
     df: pd.DataFrame, col: dict[str, str], filtros: dict[str, object]
 ) -> pd.DataFrame:
-    """Aplica todos os filtros da sidebar e retorna o DataFrame filtrado."""
+    """Aplica os filtros escolhidos na sidebar sobre a base analítica.
+
+    A função preserva a semântica da interface:
+    - filtros desativados não restringem resultados;
+    - filtros ativados sem seleção retornam base vazia;
+    - checkboxes adicionais refinam o subconjunto final.
+
+    Args:
+        df: Base analítica completa.
+        col: Mapeamento de nomes amigáveis das colunas.
+        filtros: Estado atual dos controles retornado por `construir_filtros`.
+
+    Returns:
+        Novo DataFrame contendo apenas os registros compatíveis com os filtros
+        ativos.
+    """
     mascara = df[col["ano"]].between(*filtros["faixa_anos"])
 
     if filtros["equipes"] is not None:
