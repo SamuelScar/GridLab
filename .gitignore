@@ -26,6 +26,12 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Environment variables
+.env
+
+# Local tooling artifacts
+.codex
+
 # Dataset files and local data
 *.sqlite3
 *.db
