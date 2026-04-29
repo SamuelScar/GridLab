@@ -2,6 +2,18 @@
 
 Aplicação web para análise exploratória da Fórmula 1 com filtros interativos, KPIs, gráficos focados em insights de impacto e uma aba dedicada para relacionamento dinâmico entre variáveis.
 
+## Contextualização do Problema
+
+Na Fórmula 1, o desempenho de pilotos e equipes ao longo de uma temporada não depende apenas de velocidade, estratégia e número de vitórias. O campeonato também é fortemente afetado por adversidades, como acidentes, colisões, rodadas, falhas mecânicas e outras situações que impedem a conclusão de uma prova ou comprometem a pontuação esperada em uma corrida.
+
+Esse tema é relevante porque, em um campeonato de longa duração, a consistência costuma ser tão importante quanto momentos de alto desempenho. Um piloto ou uma equipe pode perder pontos decisivos por causa de incidentes isolados, mas ainda assim manter competitividade e terminar bem colocado no campeonato. Por isso, o projeto busca analisar não apenas quem pontua mais, mas também quem consegue sustentar bons resultados mesmo diante de dificuldades ao longo da temporada.
+
+Os dados utilizados vêm do dataset `jtrotman/formula-1-race-data`, disponibilizado no Kaggle, e reúnem informações históricas da Fórmula 1 em diferentes tabelas, incluindo resultados de corrida, pilotos, equipes, circuitos, status finais e classificações de campeonato. A partir dessas tabelas, é possível relacionar eventos ocorridos nas corridas com o desempenho acumulado de pilotos e construtores ao fim de cada temporada.
+
+## Pergunta de Pesquisa
+
+Em que medida incidentes e não conclusões ao longo da temporada estão associados à posição final no campeonato, e quais pilotos e equipes mais superaram essas adversidades?
+
 ## Pré-requisitos
 
 - Python 3.11+

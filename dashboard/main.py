@@ -7,7 +7,11 @@ analítica, construção dos filtros e renderização das abas do dashboard.
 import streamlit as st
 
 from dashboard.components import (
+    filtrar_base_temporada,
+    montar_base_temporada,
+    preparar_base_principal,
     render_cabecalho,
+    render_contexto_analise,
     render_dados_filtrados,
     render_graficos,
     render_kpis,
@@ -25,7 +29,7 @@ def configurar_pagina() -> None:
     manter o padrão visual entre todos os componentes renderizados.
     """
     st.set_page_config(
-        page_title="Dashboard F1: Insights de Corrida",
+        page_title="Dashboard F1: Adversidade e Resiliência Competitiva",
         page_icon=":bar_chart:",
         layout="wide",
     )
@@ -55,20 +59,32 @@ def main() -> None:
     filtros = construir_filtros(df, col)
     df_filtrado = aplicar_filtros(df, col, filtros)
 
+    st.markdown("### Visão da análise")
+    visao = st.radio(
+        "Escolha o foco principal do campeonato",
+        ["Pilotos", "Equipes"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    base_temporada = montar_base_temporada(df_filtrado, col, visao)
+    base_temporada = filtrar_base_temporada(base_temporada, filtros, visao)
+    base_principal = preparar_base_principal(base_temporada, visao)
+
     aba_principal, aba_relacoes = st.tabs(
         ["Visão principal", "Relacionamento dinâmico"]
     )
 
     with aba_principal:
-        render_kpis(df_filtrado, col)
-        if df_filtrado.empty:
+        render_contexto_analise(visao, filtros["faixa_anos"])
+        if base_principal.empty:
             st.warning("Nenhum registro encontrado com os filtros atuais.")
         else:
-            render_graficos(df_filtrado, col)
-            render_dados_filtrados(df_filtrado, col)
+            render_kpis(base_principal, visao)
+            render_graficos(base_principal, visao)
+            render_dados_filtrados(base_principal, visao)
 
     with aba_relacoes:
-        if df_filtrado.empty:
+        if base_principal.empty:
             st.info("Ajuste os filtros para gerar a análise dinâmica.")
         else:
-            render_relacionamento_dinamico(df_filtrado, col)
+            render_relacionamento_dinamico(base_principal, visao)

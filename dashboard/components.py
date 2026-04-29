@@ -1,175 +1,46 @@
 """Componentes visuais e agregações usadas pelo dashboard.
 
-O módulo combina pequenas rotinas de formatação, cálculos auxiliares e a
-renderização dos elementos visuais e gráficos apresentados ao usuário final.
+O módulo organiza a interface em torno de uma pergunta central: como
+adversidades ao longo da temporada se relacionam com a posição final de pilotos
+e equipes no campeonato?
 """
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Paleta base manual para países frequentes nas visualizações.
-PAIS_COR_BASE = {
-    "Estados Unidos": "#3C3B6E",
-    "Itália": "#009246",
-    "Áustria": "#ED2939",
-    "Suécia": "#006AA7",
-    "Suíça": "#D52B1E",
-    "Nova Zelândia": "#1E3A8A",
-    "Bélgica": "#FFD90C",
-    "França": "#0055A4",
-    "Argentina": "#6CB4EE",
-    "África do Sul": "#2E7D32",
-    "Reino Unido": "#1B4BA0",
-    "Brasil": "#1E9C3F",
-    "Alemanha": "#FFCC00",
-    "Países Baixos": "#FF6F00",
-    "Espanha": "#AA151B",
-    "Canadá": "#D80621",
-    "Austrália": "#1976D2",
-    "Finlândia": "#1F6FEB",
-    "México": "#006847",
-    "Japão": "#BC002D",
-    "Mônaco": "#CE1126",
-    "Portugal": "#046A38",
-    "Dinamarca": "#C60C30",
-    "Irlanda": "#169B62",
-    "Polônia": "#DC143C",
-    "Rússia": "#2557A7",
-    "Tchéquia": "#11457E",
-    "Chile": "#D52B1E",
-    "Uruguai": "#2D68C4",
-    "Venezuela": "#0038A8",
-    "Tailândia": "#A51931",
-    "China": "#DE2910",
-    "Índia": "#FF9933",
-    "Indonésia": "#CE1126",
-    "Malásia": "#005AAA",
-    "Hong Kong": "#C8102E",
-    "Hungria": "#477050",
-    "Colômbia": "#FCD116",
-    "Liechtenstein": "#002B7F",
-    "Alemanha Oriental": "#FDB913",
-    "Rodésia": "#4CAF50",
+
+TOP_FINISH_LIMIT = {"Pilotos": 5, "Equipes": 3}
+MIN_PARTICIPATION_PILOTS = 50.0
+RATE_BANDS = ["0-10%", "11-20%", "21-30%", "31%+"]
+RATE_COLORS = {
+    "0-10%": "#CFE8E3",
+    "11-20%": "#87BBA2",
+    "21-30%": "#55828B",
+    "31%+": "#3B6064",
 }
-
-# Conjunto de status considerados falhas mecânicas para fins analíticos.
-MECHANICAL_FAILURE_STATUSES = {
-    "Engine",
-    "Gearbox",
-    "Transmission",
-    "Clutch",
-    "Hydraulics",
-    "Electrical",
-    "Radiator",
-    "Suspension",
-    "Brakes",
-    "Differential",
-    "Overheating",
-    "Mechanical",
-    "Tyre",
-    "Puncture",
-    "Driveshaft",
-    "Fuel pump",
-    "Fuel pressure",
-    "Oil pressure",
-    "Water pressure",
-    "Fuel",
-    "Throttle",
-    "Electronics",
-    "Power Unit",
-    "ERS",
-    "Turbo",
-    "CV joint",
-    "Wheel",
-    "Wheel bearing",
-    "Rear wing",
-    "Front wing",
-    "Technical",
-    "Spark plugs",
-    "Alternator",
-    "Injection",
-    "Fuel leak",
-    "Exhaust",
-    "Oil leak",
-    "Halfshaft",
-    "Crankshaft",
-    "Vibrations",
-    "Undertray",
-    "Power loss",
-    "Ignition",
-    "Battery",
-    "Distributor",
-    "Magneto",
-    "Water leak",
+SITUATION_COLORS = {
+    "Com o problema": "#C1121F",
+    "Sem o problema": "#669BBC",
 }
-
-
-def _mapear_cores_paises(paises: list[str]) -> dict[str, str]:
-    """Mapeia países para cores consistentes nas visualizações.
-
-    Args:
-        paises: Lista de países na ordem em que aparecem no gráfico.
-
-    Returns:
-        Dicionário de país para cor hexadecimal, usando a paleta base sempre
-        que disponível e uma paleta Plotly como fallback.
-    """
-    fallback = (
-        px.colors.qualitative.Safe
-        + px.colors.qualitative.Bold
-        + px.colors.qualitative.Set2
-    )
-    mapa: dict[str, str] = {}
-    idx_fallback = 0
-    for pais in dict.fromkeys(paises):
-        if pais in PAIS_COR_BASE:
-            mapa[pais] = PAIS_COR_BASE[pais]
-        else:
-            mapa[pais] = fallback[idx_fallback % len(fallback)]
-            idx_fallback += 1
-    return mapa
 
 
 def media_formatada(valor: float, sufixo: str = "") -> str:
-    """Formata médias numéricas para exibição textual.
-
-    Args:
-        valor: Valor numérico que será exibido.
-        sufixo: Texto opcional concatenado ao final do número formatado.
-
-    Returns:
-        String formatada com duas casas decimais ou `N/A` para valores ausentes.
-    """
+    """Formata médias numéricas para exibição textual."""
     if pd.isna(valor):
         return "N/A"
     return f"{valor:.2f}{sufixo}"
 
 
 def percentual_formatado(valor: float) -> str:
-    """Formata um valor percentual para exibição.
-
-    Args:
-        valor: Valor percentual em escala de 0 a 100.
-
-    Returns:
-        String formatada com uma casa decimal ou `N/A` para valores ausentes.
-    """
+    """Formata um valor percentual para exibição."""
     if pd.isna(valor):
         return "N/A"
     return f"{valor:.1f}%"
 
 
 def ajustar_figura(fig):
-    """Aplica o padrão visual compartilhado aos gráficos Plotly.
-
-    Args:
-        fig: Figura Plotly já construída.
-
-    Returns:
-        A própria figura recebida, após aplicar layout, altura e margens
-        padronizadas para o dashboard.
-    """
+    """Aplica o padrão visual compartilhado aos gráficos Plotly."""
     fig.update_layout(
         template="plotly_white",
         height=380,
@@ -179,426 +50,592 @@ def ajustar_figura(fig):
     return fig
 
 
-def render_cabecalho() -> None:
-    """Renderiza o título principal da aplicação."""
-    st.title("Dashboard F1: Insights de Corrida e Performance")
-
-
-def render_kpis(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Exibe os indicadores principais com base no recorte atual.
-
-    Args:
-        df_filtrado: Base já filtrada conforme a seleção do usuário.
-        col: Mapeamento de nomes amigáveis das colunas.
-    """
-    st.markdown("### Indicadores principais")
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4, gap="medium")
-
-    pontos_totais = df_filtrado[col["pontos"]].sum(min_count=1)
-    if pd.isna(pontos_totais):
-        pontos_totais_txt = "N/A"
-    else:
-        pontos_totais_txt = f"{pontos_totais:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    kpi1.metric("Resultados filtrados", f"{len(df_filtrado):,}".replace(",", "."))
-    kpi2.metric(
-        "Corridas únicas",
-        f"{df_filtrado[col['id_corrida']].nunique():,}".replace(",", "."),
+def _juntar_unicos(valores: pd.Series) -> str:
+    """Une valores textuais únicos preservando legibilidade."""
+    unicos = sorted(
+        {
+            str(valor).strip()
+            for valor in valores.dropna()
+            if str(valor).strip() and str(valor).strip() != "Não informado"
+        }
     )
-    kpi3.metric(
-        "Pilotos únicos",
-        f"{df_filtrado[col['piloto']].nunique():,}".replace(",", "."),
-    )
-    kpi4.metric(
-        "Pontuação total",
-        pontos_totais_txt,
-    )
+    if not unicos:
+        return "Não informado"
+    return ", ".join(unicos)
 
 
-def _falha_mecanica_por_nacionalidade(
-    df_filtrado: pd.DataFrame, col: dict[str, str]
+def _colunas_visao(visao: str, col: dict[str, str]) -> dict[str, str]:
+    """Retorna o conjunto de colunas-base usadas em cada visão."""
+    if visao == "Pilotos":
+        return {
+            "entidade": col["piloto"],
+            "apoio": col["equipe"],
+            "apoio_rotulo": "Equipe(s) na temporada",
+            "pos_campeonato": col["pos_campeonato_piloto"],
+            "pts_campeonato": col["pts_campeonato_piloto"],
+            "participacoes": "Corridas disputadas",
+            "top_label": "Top 5",
+        }
+    return {
+        "entidade": col["equipe"],
+        "apoio": col["piloto"],
+        "apoio_rotulo": "Pilotos na temporada",
+        "pos_campeonato": col["pos_campeonato_equipe"],
+        "pts_campeonato": col["pts_campeonato_equipe"],
+        "participacoes": "Resultados considerados",
+        "top_label": "Top 3",
+    }
+
+
+def _meta_visao(visao: str) -> dict[str, str | int]:
+    """Retorna rótulos compartilhados por visão."""
+    if visao == "Pilotos":
+        return {
+            "apoio_rotulo": "Equipe(s) na temporada",
+            "participacoes": "Corridas disputadas",
+            "top_label": "Top 5",
+            "faixas_posicao": ["Top 5", "6-10", "11-20", "21+"],
+        }
+    return {
+        "apoio_rotulo": "Pilotos na temporada",
+        "participacoes": "Resultados considerados",
+        "top_label": "Top 3",
+        "faixas_posicao": ["Top 3", "4-6", "7-10", "11+"],
+    }
+
+
+def _faixa_posicao(valor: float, visao: str) -> str:
+    """Classifica a posição final em grupos simples."""
+    if pd.isna(valor):
+        return "Não informado"
+    if visao == "Pilotos":
+        if valor <= 5:
+            return "Top 5"
+        if valor <= 10:
+            return "6-10"
+        if valor <= 20:
+            return "11-20"
+        return "21+"
+    if valor <= 3:
+        return "Top 3"
+    if valor <= 6:
+        return "4-6"
+    if valor <= 10:
+        return "7-10"
+    return "11+"
+
+
+def _faixa_taxa_adversidade(valor: float) -> str:
+    """Classifica a taxa de adversidade em faixas simples."""
+    if pd.isna(valor):
+        return "Não informado"
+    if valor <= 10:
+        return "0-10%"
+    if valor <= 20:
+        return "11-20%"
+    if valor <= 30:
+        return "21-30%"
+    return "31%+"
+
+
+def montar_base_temporada(
+    df_filtrado: pd.DataFrame, col: dict[str, str], visao: str
 ) -> pd.DataFrame:
-    """Resume a incidência de falhas mecânicas por país do piloto.
-
-    Args:
-        df_filtrado: Base analítica após aplicação dos filtros.
-        col: Mapeamento de nomes amigáveis das colunas.
-
-    Returns:
-        DataFrame agregado com participações, falhas mecânicas e taxa de falha
-        por país, já limitado ao top 10 com amostra mínima.
-    """
+    """Agrega a base corrida a corrida em temporadas de pilotos ou equipes."""
+    cfg = _colunas_visao(visao, col)
     dados = df_filtrado.dropna(
-        subset=[col["nac_piloto"], col["status"]]
-    )
-    dados = dados.copy()
-    dados["Falha mecânica"] = dados[col["status"]].isin(MECHANICAL_FAILURE_STATUSES)
-
-    resumo = (
-        dados.groupby(col["nac_piloto"], as_index=False)
-        .agg(
-            Participações=(col["id_corrida"], "count"),
-            **{
-                "Falhas mecânicas": ("Falha mecânica", "sum"),
-                "Taxa de falha mecânica (%)": (
-                    "Falha mecânica",
-                    lambda serie: serie.mean() * 100,
-                ),
-            },
-        )
-        .sort_values("Participações", ascending=False)
-    )
-    filtrado = resumo[resumo["Participações"] >= 120]
-    if filtrado.empty:
-        filtrado = resumo[resumo["Participações"] >= 20]
-    return filtrado.sort_values("Taxa de falha mecânica (%)", ascending=False).head(10)
-
-
-def _pilotos_maior_recuperacao(
-    df_filtrado: pd.DataFrame, col: dict[str, str]
-) -> pd.DataFrame:
-    """Identifica pilotos que mais ganham posições ao longo da corrida.
-
-    Args:
-        df_filtrado: Base analítica após aplicação dos filtros.
-        col: Mapeamento de nomes amigáveis das colunas.
-
-    Returns:
-        DataFrame agregado por piloto com média de posições ganhas, taxa de
-        abandono e filtro por amostra mínima.
-    """
-    dados = df_filtrado[df_filtrado[col["grid"]].between(1, 20)].dropna(
-        subset=[col["piloto"], col["ganho"], col["abandono"]]
-    )
-    resumo = (
-        dados.groupby(col["piloto"], as_index=False)
-        .agg(
-            Largadas=(col["id_corrida"], "count"),
-            **{
-                "Posições ganhas médias": (col["ganho"], "mean"),
-                "Taxa de abandono (%)": (col["abandono"], lambda serie: serie.mean() * 100),
-            },
-        )
-        .sort_values("Largadas", ascending=False)
-    )
-    filtrado = resumo[resumo["Largadas"] >= 40]
-    if filtrado.empty:
-        filtrado = resumo[resumo["Largadas"] >= 10]
-    return filtrado.sort_values("Posições ganhas médias", ascending=False).head(10)
-
-
-def _desempenho_por_faixa_grid(
-    df_filtrado: pd.DataFrame, col: dict[str, str]
-) -> pd.DataFrame:
-    """Calcula desempenho médio por faixa de posição de largada.
-
-    Args:
-        df_filtrado: Base analítica após aplicação dos filtros.
-        col: Mapeamento de nomes amigáveis das colunas.
-
-    Returns:
-        DataFrame com amostra, taxa de pódio e taxa de pontuação por faixa de
-        grid, considerando apenas largadas válidas entre 1 e 20.
-    """
-    dados = df_filtrado[df_filtrado[col["grid"]].between(1, 20)].dropna(
-        subset=[col["grid"], col["chegada"], col["pontos"]]
-    )
-    dados = dados.copy()
-    dados["Faixa do grid"] = pd.cut(
-        dados[col["grid"]],
-        bins=[0, 5, 10, 15, 20],
-        labels=["1-5", "6-10", "11-15", "16-20"],
-    )
-    dados["pódio"] = dados[col["chegada"]] <= 3
-    dados["pontuou_temp"] = dados[col["pontos"]] > 0
-
-    resumo = (
-        dados.groupby("Faixa do grid", as_index=False, observed=True)
-        .agg(
-            Amostra=(col["id_corrida"], "count"),
-            **{
-                "Taxa de pódio (%)": ("pódio", lambda serie: serie.mean() * 100),
-                "Taxa de pontuar (%)": ("pontuou_temp", lambda serie: serie.mean() * 100),
-            },
-        )
-        .sort_values("Faixa do grid")
-    )
-    return resumo[resumo["Amostra"] >= 30]
-
-
-def _numero_da_sorte(df_filtrado: pd.DataFrame, col: dict[str, str]) -> pd.DataFrame:
-    """Resume o desempenho histórico associado a cada número de piloto.
-
-    Args:
-        df_filtrado: Base analítica após aplicação dos filtros.
-        col: Mapeamento de nomes amigáveis das colunas.
-
-    Returns:
-        DataFrame agregado por número do piloto com volume de corridas,
-        vitórias, pontos e métricas percentuais usadas no gráfico temático.
-    """
-    dados = df_filtrado.dropna(
-        subset=[col["numero_piloto"], col["chegada"], col["pontos"]]
+        subset=[
+            col["ano"],
+            cfg["entidade"],
+            cfg["pos_campeonato"],
+            cfg["pts_campeonato"],
+        ]
     ).copy()
     if dados.empty:
         return pd.DataFrame()
 
-    dados["vitória"] = dados[col["chegada"]] == 1
-    resumo = (
-        dados.groupby(col["numero_piloto"], as_index=False)
-        .agg(
-            **{"Corridas com esse número": (col["id_corrida"], "count")},
-            **{
-                "Vitórias": ("vitória", "sum"),
-                "Pontos totais": (col["pontos"], "sum"),
-                "Percentual de corridas com pontos (%)": (
-                    col["pontuou"],
-                    lambda serie: serie.mean() * 100,
-                ),
-                "Percentual de vitórias (%)": (
-                    "vitória",
-                    lambda serie: serie.mean() * 100,
-                ),
-                "Pontos médios": (col["pontos"], "mean"),
-            },
+    etapas_temporada = (
+        df_filtrado.groupby(col["ano"], as_index=False)[col["id_corrida"]]
+        .nunique()
+        .rename(
+            columns={
+                col["ano"]: "Ano",
+                col["id_corrida"]: "Etapas da temporada",
+            }
         )
-        .sort_values("Corridas com esse número", ascending=False)
     )
 
-    resumo = resumo.copy()
-    resumo[col["numero_piloto"]] = resumo[col["numero_piloto"]].astype(int)
-    resumo["Número"] = "Nº " + resumo[col["numero_piloto"]].astype(str)
+    resumo = (
+        dados.groupby(
+            [col["ano"], cfg["entidade"], cfg["pos_campeonato"], cfg["pts_campeonato"]],
+            as_index=False,
+        )
+        .agg(
+            **{cfg["participacoes"]: (col["id_corrida"], "count")},
+            **{
+                cfg["apoio_rotulo"]: (cfg["apoio"], _juntar_unicos),
+                "Incidentes": (col["incidente"], "sum"),
+                "Falhas mecânicas": (col["falha_mecanica"], "sum"),
+                "Outras não conclusões": (col["outra_nao_conclusao"], "sum"),
+                "Adversidades": (col["adversidade"], "sum"),
+            },
+        )
+        .rename(
+            columns={
+                col["ano"]: "Ano",
+                cfg["entidade"]: "Entidade",
+                cfg["pos_campeonato"]: "Posição final no campeonato",
+                cfg["pts_campeonato"]: "Pontos finais na temporada",
+            }
+        )
+    )
+
+    resumo = resumo.merge(etapas_temporada, on="Ano", how="left")
+    resumo["Taxa de adversidade (%)"] = (
+        resumo["Adversidades"] / resumo[cfg["participacoes"]] * 100
+    )
+    resumo["Participação na temporada (%)"] = (
+        resumo[cfg["participacoes"]] / resumo["Etapas da temporada"] * 100
+    )
+    resumo["Faixa de taxa de adversidade"] = resumo["Taxa de adversidade (%)"].apply(
+        _faixa_taxa_adversidade
+    )
+    resumo["Faixa de posição final"] = resumo["Posição final no campeonato"].apply(
+        lambda valor: _faixa_posicao(valor, visao)
+    )
+    resumo["Terminou no topo"] = (
+        resumo["Posição final no campeonato"] <= TOP_FINISH_LIMIT[visao]
+    )
+    return resumo.sort_values(
+        by=["Ano", "Posição final no campeonato", "Adversidades"],
+        ascending=[False, True, False],
+    ).reset_index(drop=True)
+
+
+def preparar_base_principal(
+    base_temporada: pd.DataFrame, visao: str
+) -> pd.DataFrame:
+    """Aplica recortes metodológicos para os gráficos principais."""
+    if base_temporada.empty:
+        return base_temporada
+
+    if visao == "Pilotos":
+        return base_temporada[
+            base_temporada["Participação na temporada (%)"] >= MIN_PARTICIPATION_PILOTS
+        ].reset_index(drop=True)
+    return base_temporada.copy()
+
+
+def filtrar_base_temporada(
+    base_temporada: pd.DataFrame, filtros: dict[str, object], visao: str
+) -> pd.DataFrame:
+    """Aplica filtros de entidade sobre a base já agregada por temporada."""
+    if base_temporada.empty:
+        return base_temporada
+
+    meta = _meta_visao(visao)
+    filtrado = base_temporada.copy()
+
+    equipes = filtros.get("equipes")
+    pilotos = filtros.get("pilotos")
+
+    if visao == "Pilotos":
+        if pilotos is not None:
+            if not pilotos:
+                return filtrado.iloc[0:0].copy()
+            filtrado = filtrado[filtrado["Entidade"].isin(pilotos)]
+        if equipes is not None:
+            if not equipes:
+                return filtrado.iloc[0:0].copy()
+            mascara = filtrado[meta["apoio_rotulo"]].apply(
+                lambda texto: any(equipe in texto for equipe in equipes)
+            )
+            filtrado = filtrado[mascara]
+    else:
+        if equipes is not None:
+            if not equipes:
+                return filtrado.iloc[0:0].copy()
+            filtrado = filtrado[filtrado["Entidade"].isin(equipes)]
+        if pilotos is not None:
+            if not pilotos:
+                return filtrado.iloc[0:0].copy()
+            mascara = filtrado[meta["apoio_rotulo"]].apply(
+                lambda texto: any(piloto in texto for piloto in pilotos)
+            )
+            filtrado = filtrado[mascara]
+
+    return filtrado.reset_index(drop=True)
+
+
+def render_cabecalho() -> None:
+    """Renderiza o título principal da aplicação."""
+    st.title("Dashboard F1: Adversidade e Resiliência Competitiva")
+    st.caption(
+        "Análise descritiva de como incidentes e não conclusões se relacionam "
+        "com a posição final no campeonato."
+    )
+
+
+def render_contexto_analise(visao: str, faixa_anos: tuple[int, int]) -> None:
+    """Apresenta o contexto do problema e a pergunta de pesquisa."""
+    alvo = "pilotos" if visao == "Pilotos" else "equipes"
+    st.markdown("### Contexto da análise")
+    st.markdown(
+        "O foco desta análise é observar se temporadas com mais adversidades "
+        "tendem a terminar em posições piores no campeonato."
+    )
+    st.info(
+        "Pergunta de pesquisa: em que medida incidentes e não conclusões ao "
+        "longo da temporada estão associados à posição final no campeonato, e "
+        f"quais {alvo} mais superaram essas adversidades?"
+    )
+    st.markdown(
+        "**Adversidade no estudo:** incidentes de pista, problemas mecânicos e "
+        "outros abandonos."
+    )
+    if faixa_anos[0] < 2010 or faixa_anos[1] > 2025:
+        st.caption(
+            "Comparações históricas amplas exigem cautela: regras, pontuação e "
+            "número de corridas mudaram bastante ao longo do tempo."
+        )
+    else:
+        st.caption(
+            "Recorte recomendado: de 2010 a 2025 as comparações ficam mais homogêneas."
+        )
+    with st.expander("Definições e cuidados metodológicos", expanded=False):
+        st.markdown("**O que entra como adversidade**")
+        st.markdown(
+            "- **Incidentes de pista**: batidas, colisões e saídas de pista."
+        )
+        st.markdown(
+            "- **Problemas mecânicos**: falhas como motor, câmbio, transmissão, "
+            "parte elétrica, suspensão e outros defeitos técnicos do carro."
+        )
+        st.markdown(
+            "- **Outros abandonos**: corridas que não foram concluídas e que não se "
+            "encaixam claramente nos dois grupos anteriores."
+        )
+        st.markdown(
+            "- **Taxa de adversidade na temporada**: porcentagem de corridas "
+            "daquele ano em que o piloto ou a equipe passou por pelo menos uma "
+            "dessas situações."
+        )
+        st.markdown("**Cuidados na interpretação**")
+        st.markdown(
+            "- Ao comparar décadas diferentes, é preciso considerar mudanças no "
+            "número de corridas por temporada, no sistema de pontuação e nas "
+            "regras da Fórmula 1."
+        )
+        st.markdown(
+            "- Para comparações mais justas, o recorte de 2010 a 2025 costuma ser "
+            "o mais estável."
+        )
+        if visao == "Pilotos":
+            st.markdown(
+                "- Na visão de pilotos, os gráficos principais consideram apenas "
+                "temporadas em que o piloto disputou pelo menos metade das corridas "
+                "do ano. Isso evita comparações distorcidas com participações pontuais."
+            )
+
+
+def render_kpis(base_temporada: pd.DataFrame, visao: str) -> None:
+    """Exibe indicadores principais da visão por temporada."""
+    st.markdown("### Indicadores principais")
+
+    kpi1, kpi2 = st.columns(2, gap="medium")
+    kpi1.metric(
+        "Temporadas analisadas",
+        f"{len(base_temporada):,}".replace(",", "."),
+    )
+    kpi2.metric(
+        "Adversidades totais",
+        f"{int(base_temporada['Adversidades'].sum()):,}".replace(",", "."),
+    )
+
+    res1, res2, res3 = st.columns(3, gap="medium")
+    res1.metric(
+        "Taxa média de adversidade",
+        percentual_formatado(base_temporada["Taxa de adversidade (%)"].mean()),
+    )
+    res2.metric(
+        "Média de adversidades por temporada",
+        media_formatada(base_temporada["Adversidades"].mean()),
+    )
+    res3.metric(
+        "Pontos médios na temporada",
+        media_formatada(base_temporada["Pontos finais na temporada"].mean()),
+    )
+
+
+def _resumo_por_posicao_final(base_temporada: pd.DataFrame) -> pd.DataFrame:
+    """Resume a taxa média de adversidade por grupo de posição final."""
+    dados = base_temporada.dropna(subset=["Faixa de posição final"]).copy()
+    if dados.empty:
+        return pd.DataFrame()
+
+    resumo = (
+        dados.groupby("Faixa de posição final", as_index=False)
+        .agg(
+            Temporadas=("Entidade", "count"),
+            **{
+                "Taxa média de adversidade (%)": (
+                    "Taxa de adversidade (%)",
+                    "mean",
+                ),
+            },
+        )
+    )
     return resumo
 
 
-def _abandono_por_tamanho_prova(
-    df_filtrado: pd.DataFrame, col: dict[str, str]
-) -> pd.DataFrame:
-    """Mede abandono e ganho médio por tamanho da prova.
-
-    Args:
-        df_filtrado: Base analítica após aplicação dos filtros.
-        col: Mapeamento de nomes amigáveis das colunas.
-
-    Returns:
-        DataFrame resumido por faixa de quantidade de voltas, já com taxa de
-        abandono e média de posições ganhas.
-    """
-    dados = df_filtrado.dropna(
-        subset=[col["id_corrida"], col["voltas"], col["abandono"], col["ganho"]]
-    ).copy()
+def _resumo_topo_por_taxa(base_temporada: pd.DataFrame) -> pd.DataFrame:
+    """Resume a presença no topo por faixa de taxa de adversidade."""
+    dados = base_temporada.dropna(subset=["Faixa de taxa de adversidade"]).copy()
     if dados.empty:
         return pd.DataFrame()
 
-    voltas_gp = (
-        dados.groupby(col["id_corrida"], as_index=False)[col["voltas"]]
-        .max()
-        .rename(columns={col["voltas"]: "Voltas da corrida"})
-    )
-    dados = dados.merge(voltas_gp, on=col["id_corrida"], how="left")
-    dados["Faixa de corrida"] = pd.cut(
-        dados["Voltas da corrida"],
-        bins=[0, 55, 66, float("inf")],
-        labels=[
-            "Curta (até 55 voltas)",
-            "Média (56 a 66 voltas)",
-            "Longa (67+ voltas)",
-        ],
-    )
-
     resumo = (
-        dados.groupby("Faixa de corrida", as_index=False, observed=True)
+        dados.groupby("Faixa de taxa de adversidade", as_index=False)
         .agg(
-            Resultados=(col["id_corrida"], "count"),
+            Temporadas=("Entidade", "count"),
             **{
-                "Taxa de abandono (%)": (col["abandono"], lambda serie: serie.mean() * 100),
-                "Posições ganhas médias": (col["ganho"], "mean"),
+                "Taxa no topo (%)": ("Terminou no topo", lambda serie: serie.mean() * 100),
             },
         )
-        .sort_values("Faixa de corrida")
     )
-    return resumo[resumo["Resultados"] >= 30]
+    return resumo
 
 
-def render_graficos(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Renderiza o conjunto principal de gráficos do dashboard.
+def _comparacao_posicao_por_tipo(base_temporada: pd.DataFrame) -> pd.DataFrame:
+    """Compara a posição média final com e sem cada tipo de problema."""
+    tipos = [
+        ("Incidentes", "Incidentes de pista"),
+        ("Falhas mecânicas", "Problemas mecânicos"),
+        ("Outras não conclusões", "Outros abandonos"),
+    ]
+    linhas: list[dict[str, float | str | int]] = []
+    ordem_tipos: list[tuple[str, float]] = []
 
-    Os quatro gráficos cobrem:
-    - falhas mecânicas por país;
-    - recuperação média de posições por piloto;
-    - desempenho por número do piloto;
-    - abandono por faixa de tamanho da corrida.
+    for coluna, rotulo in tipos:
+        com_tipo = base_temporada[base_temporada[coluna] > 0]
+        sem_tipo = base_temporada[base_temporada[coluna] == 0]
+        if com_tipo.empty or sem_tipo.empty:
+            continue
 
-    Args:
-        df_filtrado: Base já filtrada conforme a seleção do usuário.
-        col: Mapeamento de nomes amigáveis das colunas.
-    """
+        media_com = com_tipo["Posição final no campeonato"].mean()
+        media_sem = sem_tipo["Posição final no campeonato"].mean()
+        ordem_tipos.append((rotulo, media_com - media_sem))
+
+        linhas.extend(
+            [
+                {
+                    "Tipo de problema": rotulo,
+                    "Situação": "Com o problema",
+                    "Posição média final no campeonato": media_com,
+                    "Taxa no topo (%)": com_tipo["Terminou no topo"].mean() * 100,
+                    "Temporadas": len(com_tipo),
+                },
+                {
+                    "Tipo de problema": rotulo,
+                    "Situação": "Sem o problema",
+                    "Posição média final no campeonato": media_sem,
+                    "Taxa no topo (%)": sem_tipo["Terminou no topo"].mean() * 100,
+                    "Temporadas": len(sem_tipo),
+                },
+            ]
+        )
+
+    if not linhas:
+        return pd.DataFrame()
+
+    comparacao = pd.DataFrame(linhas)
+    ordem = [
+        rotulo
+        for rotulo, _ in sorted(ordem_tipos, key=lambda item: item[1], reverse=True)
+    ]
+    comparacao["Tipo de problema"] = pd.Categorical(
+        comparacao["Tipo de problema"],
+        categories=ordem,
+        ordered=True,
+    )
+    return comparacao.sort_values(["Tipo de problema", "Situação"])
+
+
+def _ranking_resiliencia(base_temporada: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona temporadas no topo com maior taxa de adversidade."""
+    ranking = base_temporada[base_temporada["Terminou no topo"]].copy()
+    if ranking.empty:
+        return pd.DataFrame()
+
+    ranking["Temporada"] = (
+        ranking["Entidade"] + " (" + ranking["Ano"].astype(int).astype(str) + ")"
+    )
+    return ranking.sort_values(
+        by=[
+            "Taxa de adversidade (%)",
+            "Adversidades",
+            "Posição final no campeonato",
+        ],
+        ascending=[False, False, True],
+    ).head(10)
+
+
+def render_graficos(base_temporada: pd.DataFrame, visao: str) -> None:
+    """Renderiza quatro gráficos simples alinhados à pergunta de pesquisa."""
+    meta = _meta_visao(visao)
+    entidade_label = "pilotos" if visao == "Pilotos" else "equipes"
     st.markdown("### Gráficos principais")
+    st.caption(
+        "Nos gráficos abaixo, cada observação representa uma temporada completa "
+        f"de {entidade_label}. Sempre que aparecer a expressão taxa de "
+        "adversidade, ela indica a porcentagem de corridas daquela temporada "
+        "em que houve incidente de pista, problema mecânico ou outro abandono."
+    )
+
+    resumo_posicao = _resumo_por_posicao_final(base_temporada)
+    resumo_taxa = _resumo_topo_por_taxa(base_temporada)
+    comparacao_tipos = _comparacao_posicao_por_tipo(base_temporada)
+    ranking = _ranking_resiliencia(base_temporada)
 
     row1_col1, row1_col2 = st.columns(2, gap="large")
     with row1_col1:
-        falhas_nacionalidade = _falha_mecanica_por_nacionalidade(df_filtrado, col)
-        if falhas_nacionalidade.empty:
-            st.info("Não há dados suficientes para o ranking de falha mecânica por país.")
+        if resumo_posicao.empty:
+            st.info("Não há dados suficientes para resumir adversidade por posição final.")
         else:
-            ranking_paises = falhas_nacionalidade.sort_values(
-                "Taxa de falha mecânica (%)", ascending=False
-            )
-            ordem_paises = ranking_paises[col["nac_piloto"]].astype(str).tolist()
-            mapa_cores = _mapear_cores_paises(
-                ranking_paises[col["nac_piloto"]].astype(str).tolist()
-            )
             fig1 = px.bar(
-                ranking_paises,
-                x="Taxa de falha mecânica (%)",
-                y=col["nac_piloto"],
-                color=col["nac_piloto"],
-                color_discrete_map=mapa_cores,
-                category_orders={col["nac_piloto"]: ordem_paises},
-                orientation="h",
-                title="Top 10 países com maior taxa de falha mecânica",
-                hover_data={
-                    "Participações": True,
-                    "Falhas mecânicas": True,
-                    "Taxa de falha mecânica (%)": ":.1f",
-                },
+                resumo_posicao,
+                x="Faixa de posição final",
+                y="Taxa média de adversidade (%)",
+                color="Faixa de posição final",
+                title=(
+                    "Taxa média de adversidade por faixa de posição final "
+                    f"no campeonato ({entidade_label})"
+                ),
+                text_auto=".1f",
+                hover_data={"Temporadas": True, "Taxa média de adversidade (%)": ":.1f"},
+                category_orders={"Faixa de posição final": meta["faixas_posicao"]},
             )
             fig1.update_layout(showlegend=False)
-            fig1.update_yaxes(
-                categoryorder="array",
-                categoryarray=ordem_paises,
-                autorange="reversed",
+            fig1.update_xaxes(title="Faixa de posição final no campeonato")
+            st.plotly_chart(ajustar_figura(fig1), width="stretch")
+            st.caption(
+                f"Cada barra resume temporadas de {entidade_label}. A posição "
+                "final é a do campeonato, não a de uma corrida isolada."
             )
-            fig1.update_traces(
-                marker_line_color="rgba(255, 255, 255, 0.28)",
-                marker_line_width=0.8,
-            )
-            st.plotly_chart(ajustar_figura(fig1), use_container_width=True)
 
     with row1_col2:
-        recuperacao_pilotos = _pilotos_maior_recuperacao(df_filtrado, col)
-        if recuperacao_pilotos.empty:
-            st.info("Não há dados suficientes para o ranking de recuperação por piloto.")
+        if resumo_taxa.empty:
+            st.info("Não há dados suficientes para resumir presença no topo por taxa.")
         else:
             fig2 = px.bar(
-                recuperacao_pilotos.sort_values("Posições ganhas médias", ascending=True),
-                x="Posições ganhas médias",
-                y=col["piloto"],
-                orientation="h",
-                title="Top 10 pilotos que mais ganham posições na corrida",
-                hover_data={
-                    "Largadas": True,
-                    "Taxa de abandono (%)": ":.1f",
-                    "Posições ganhas médias": ":.2f",
-                },
+                resumo_taxa,
+                x="Faixa de taxa de adversidade",
+                y="Taxa no topo (%)",
+                color="Faixa de taxa de adversidade",
+                color_discrete_map=RATE_COLORS,
+                title=f"Percentual de temporadas no {meta['top_label']} por faixa de taxa de adversidade",
+                text_auto=".1f",
+                hover_data={"Temporadas": True, "Taxa no topo (%)": ":.1f"},
+                category_orders={"Faixa de taxa de adversidade": RATE_BANDS},
             )
-            st.plotly_chart(ajustar_figura(fig2), use_container_width=True)
+            fig2.update_layout(showlegend=False)
+            st.plotly_chart(ajustar_figura(fig2), width="stretch")
+            st.caption(
+                f"Leitura: cada barra agrupa temporadas de {entidade_label} pela "
+                "porcentagem de corridas com adversidade. A altura mostra qual "
+                f"parcela dessas temporadas conseguiu terminar no {meta['top_label']} "
+                "do campeonato."
+            )
 
     row2_col1, row2_col2 = st.columns(2, gap="large")
     with row2_col1:
-        numero_sorte = _numero_da_sorte(df_filtrado, col)
-        if numero_sorte.empty:
-            st.info("Não há dados suficientes para o gráfico 'Número da sorte'.")
+        if comparacao_tipos.empty:
+            st.info("Não há dados suficientes para comparar o efeito dos tipos de problema.")
         else:
-            opcoes_metricas = {
-                "Vitórias (total)": "Vitórias",
-                "Pontos (total acumulado)": "Pontos totais",
-                "Corridas em que venceu (%)": "Percentual de vitórias (%)",
-            }
-            explicacao_metricas = {
-                "Vitórias (total)": "Soma de todas as vitórias de pilotos que usaram cada número.",
-                "Pontos (total acumulado)": "Soma de todos os pontos marcados por pilotos que usaram cada número.",
-                "Corridas em que venceu (%)": "Percentual de corridas vencidas entre as corridas disputadas com cada número.",
-            }
-            metrica = st.selectbox(
-                "Métrica do número da sorte",
-                list(opcoes_metricas.keys()),
-                key="metrica_numero_sorte",
-            )
-            metrica_coluna = opcoes_metricas[metrica]
-            ranking = numero_sorte.sort_values(metrica_coluna, ascending=False).head(10)
             fig3 = px.bar(
-                ranking.sort_values(metrica_coluna, ascending=True),
-                x=metrica_coluna,
-                y="Número",
+                comparacao_tipos,
+                x="Posição média final no campeonato",
+                y="Tipo de problema",
                 orientation="h",
-                title=f"Número da sorte: top 10 por {metrica}",
+                color="Situação",
+                barmode="group",
+                color_discrete_map=SITUATION_COLORS,
+                title="Posição média final com e sem cada tipo de problema",
+                text_auto=".1f",
                 hover_data={
-                    "Corridas com esse número": True,
-                    "Vitórias": True,
-                    "Pontos totais": ":.1f",
-                    "Percentual de vitórias (%)": ":.1f",
-                    "Pontos médios": ":.2f",
+                    "Posição média final no campeonato": ":.2f",
+                    "Taxa no topo (%)": ":.1f",
+                    "Temporadas": True,
                 },
             )
-            st.plotly_chart(ajustar_figura(fig3), use_container_width=True)
-            st.caption(f"Como ler: {explicacao_metricas[metrica]}")
+            fig3.update_xaxes(
+                title="Posição média final no campeonato (quanto menor, melhor)"
+            )
+            st.plotly_chart(ajustar_figura(fig3), width="stretch")
             st.caption(
-                "Obs.: inclui números históricos (0 e >99) registrados em corridas antigas."
+                "Em cada tipo de problema, compare as barras de 'Com o problema' "
+                "e 'Sem o problema'. Quanto mais à direita a barra estiver, pior "
+                "foi a posição média final no campeonato."
             )
 
     with row2_col2:
-        tamanho_prova = _abandono_por_tamanho_prova(df_filtrado, col)
-        if tamanho_prova.empty:
-            st.info("Não há dados suficientes para analisar abandono por tamanho de corrida.")
+        if ranking.empty:
+            st.info("Não há temporadas resilientes suficientes no recorte atual.")
         else:
             fig4 = px.bar(
-                tamanho_prova,
-                x="Faixa de corrida",
-                y="Taxa de abandono (%)",
-                color="Faixa de corrida",
-                title="Abandono por tamanho da corrida (faixa de voltas)",
-                category_orders={
-                    "Faixa de corrida": [
-                        "Curta (até 55 voltas)",
-                        "Média (56 a 66 voltas)",
-                        "Longa (67+ voltas)",
-                    ]
-                },
+                ranking.sort_values("Taxa de adversidade (%)"),
+                x="Taxa de adversidade (%)",
+                y="Temporada",
+                orientation="h",
+                title=f"Temporadas no {meta['top_label']} com maior taxa de adversidade",
                 hover_data={
-                    "Resultados": True,
-                    "Taxa de abandono (%)": ":.1f",
-                    "Posições ganhas médias": ":.2f",
+                    "Posição final no campeonato": True,
+                    "Pontos finais na temporada": ":.1f",
+                    "Adversidades": True,
+                    "Incidentes": True,
+                    "Falhas mecânicas": True,
+                    "Outras não conclusões": True,
                 },
             )
-            fig4.update_layout(showlegend=False)
-            st.plotly_chart(ajustar_figura(fig4), use_container_width=True)
-            st.caption("Se uma faixa não aparecer, faltou amostra no recorte atual.")
+            st.plotly_chart(ajustar_figura(fig4), width="stretch")
+            st.caption(
+                "Aviso: Ao incluir décadas antigas, compare com "
+                "cautela. A F1 mudou bastante em regras, sistema de pontuação, "
+                "confiabilidade e número de corridas por temporada."
+            )
 
 
-def render_relacionamento_dinamico(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Renderiza uma tabela resumo configurável pelo usuário.
-
-    Args:
-        df_filtrado: Base já filtrada conforme a seleção do usuário.
-        col: Mapeamento de nomes amigáveis das colunas.
-    """
+def render_relacionamento_dinamico(base_temporada: pd.DataFrame, visao: str) -> None:
+    """Renderiza uma tabela-resumo dinâmica sobre temporadas."""
     st.markdown("### Relacionamento dinâmico")
     st.caption(
-        "Resumo personalizado: escolha uma coluna para agrupar e outra para calcular."
+        "Resumo personalizado da base por temporada para apoiar a interpretação "
+        "dos gráficos principais."
+    )
+    if base_temporada.empty:
+        st.info("Ajuste os filtros para gerar a análise dinâmica.")
+        return
+
+    dados = base_temporada.copy()
+    dados["Terminou no topo"] = dados["Terminou no topo"].map(
+        {True: "Sim", False: "Não"}
     )
 
     opcoes_categoricas = [
-        col["ano"],
-        col["equipe"],
-        col["piloto"],
-        col["numero_piloto"],
-        col["circuito"],
-        col["pais_circuito"],
-        col["status"],
-        col["nac_piloto"],
-        col["nac_equipe"],
+        "Ano",
+        "Entidade",
+        "Faixa de posição final",
+        "Faixa de taxa de adversidade",
+        "Terminou no topo",
     ]
     opcoes_numericas = [
-        col["pontos"],
-        col["grid"],
-        col["chegada"],
-        col["ganho"],
-        col["mudanca_abs"],
-        col["numero_piloto"],
-        col["voltas"],
-        col["tempo_ms"],
-        col["altitude"],
+        "Pontos finais na temporada",
+        "Posição final no campeonato",
+        "Adversidades",
+        "Incidentes",
+        "Falhas mecânicas",
+        "Outras não conclusões",
+        "Taxa de adversidade (%)",
     ]
     opcoes_metricas = {
         "Média": "mean",
@@ -617,51 +654,59 @@ def render_relacionamento_dinamico(df_filtrado: pd.DataFrame, col: dict[str, str
 
     res4, res5 = st.columns(2, gap="medium")
     ordem = res4.selectbox("Ordenar", ["Decrescente", "Crescente"])
-    limite = res5.slider("Quantidade de linhas", min_value=10, max_value=200, value=50, step=10)
+    limite = res5.slider(
+        "Quantidade de linhas",
+        min_value=10,
+        max_value=100,
+        value=30,
+        step=10,
+    )
 
     nome_coluna_saida = f"{metrica_rotulo} de {numerica}"
     resumo = (
-        df_filtrado.groupby(agrupador, as_index=False)[numerica]
+        dados.groupby(agrupador, as_index=False)[numerica]
         .agg(opcoes_metricas[metrica_rotulo])
         .rename(columns={numerica: nome_coluna_saida})
         .sort_values(by=nome_coluna_saida, ascending=(ordem == "Crescente"))
         .head(limite)
     )
-    st.caption("Tabela resumo gerada com os filtros atuais.")
-    st.dataframe(resumo.round(2), use_container_width=True, hide_index=True)
+    st.dataframe(resumo.round(2), width="stretch", hide_index=True)
 
 
-def render_dados_filtrados(df_filtrado: pd.DataFrame, col: dict[str, str]) -> None:
-    """Exibe a tabela detalhada de resultados do recorte atual.
-
-    Args:
-        df_filtrado: Base já filtrada conforme a seleção do usuário.
-        col: Mapeamento de nomes amigáveis das colunas.
-    """
+def render_dados_filtrados(base_temporada: pd.DataFrame, visao: str) -> None:
+    """Exibe a tabela detalhada já resumida por temporada."""
     st.divider()
-    colunas_exibicao = [
-        col["ano"],
-        col["rodada"],
-        col["gp"],
-        col["data"],
-        col["piloto"],
-        col["equipe"],
-        col["circuito"],
-        col["grid"],
-        col["chegada"],
-        col["pontos"],
-        col["status"],
-        col["ganho"],
-    ]
-    df_exibicao = df_filtrado[colunas_exibicao].copy().sort_values(
-        by=[col["ano"], col["rodada"], col["chegada"]],
-        ascending=[False, False, True],
-    )
-    if pd.api.types.is_datetime64_any_dtype(df_exibicao[col["data"]]):
-        df_exibicao[col["data"]] = df_exibicao[col["data"]].dt.date
+    if base_temporada.empty:
+        st.info("Não há temporadas para exibir com os filtros atuais.")
+        return
 
-    with st.expander("Dados filtrados (clique para abrir)", expanded=False):
+    meta = _meta_visao(visao)
+    df_exibicao = base_temporada[
+        [
+            "Ano",
+            "Entidade",
+            meta["apoio_rotulo"],
+            "Posição final no campeonato",
+            "Pontos finais na temporada",
+            meta["participacoes"],
+            "Incidentes",
+            "Falhas mecânicas",
+            "Outras não conclusões",
+            "Adversidades",
+            "Taxa de adversidade (%)",
+            "Participação na temporada (%)",
+            "Faixa de posição final",
+            "Faixa de taxa de adversidade",
+        ]
+    ].copy()
+
+    with st.expander("Dados consolidados por temporada (clique para abrir)", expanded=False):
         st.caption(
-            "Cada linha é o resultado de um piloto em uma corrida, considerando os filtros escolhidos."
+            "Cada linha representa uma temporada completa de piloto ou equipe, "
+            "considerando os filtros atuais."
         )
-        st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_exibicao.round(2),
+            width="stretch",
+            hide_index=True,
+        )

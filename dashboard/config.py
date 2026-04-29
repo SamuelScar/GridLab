@@ -45,6 +45,14 @@ TABELAS_F1 = {
         "colunas": ["circuitId", "name", "country", "alt"],
     },
     "status": {"arquivo": "status.csv", "colunas": ["statusId", "status"]},
+    "driver_standings": {
+        "arquivo": "driver_standings.csv",
+        "colunas": ["raceId", "driverId", "points", "position"],
+    },
+    "constructor_standings": {
+        "arquivo": "constructor_standings.csv",
+        "colunas": ["raceId", "constructorId", "points", "position"],
+    },
 }
 
 # Colunas convertidas explicitamente para tipos numéricos na carga inicial.
@@ -163,4 +171,12 @@ def obter_colunas() -> dict[str, str]:
         "pontuou": "Pontuou",
         "ganho": "Posições ganhas",
         "mudanca_abs": "Mudança absoluta de posição",
+        "incidente": "Incidente",
+        "falha_mecanica": "Falha mecânica",
+        "outra_nao_conclusao": "Outra não conclusão",
+        "adversidade": "Adversidade",
+        "pos_campeonato_piloto": "Posição final do piloto no campeonato",
+        "pts_campeonato_piloto": "Pontos finais do piloto na temporada",
+        "pos_campeonato_equipe": "Posição final da equipe no campeonato",
+        "pts_campeonato_equipe": "Pontos finais da equipe na temporada",
     }

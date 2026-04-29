@@ -18,6 +18,58 @@ from dashboard.config import (
 )
 
 
+INCIDENT_STATUSES = {"Accident", "Collision", "Spun off"}
+MECHANICAL_FAILURE_STATUSES = {
+    "Engine",
+    "Gearbox",
+    "Transmission",
+    "Clutch",
+    "Hydraulics",
+    "Electrical",
+    "Radiator",
+    "Suspension",
+    "Brakes",
+    "Differential",
+    "Overheating",
+    "Mechanical",
+    "Tyre",
+    "Puncture",
+    "Driveshaft",
+    "Fuel pump",
+    "Fuel pressure",
+    "Oil pressure",
+    "Water pressure",
+    "Fuel",
+    "Throttle",
+    "Electronics",
+    "Power Unit",
+    "ERS",
+    "Turbo",
+    "CV joint",
+    "Wheel",
+    "Wheel bearing",
+    "Rear wing",
+    "Front wing",
+    "Technical",
+    "Spark plugs",
+    "Alternator",
+    "Injection",
+    "Fuel leak",
+    "Exhaust",
+    "Oil leak",
+    "Halfshaft",
+    "Crankshaft",
+    "Vibrations",
+    "Undertray",
+    "Power loss",
+    "Ignition",
+    "Battery",
+    "Distributor",
+    "Magneto",
+    "Water leak",
+}
+
+
 def _validar_arquivos(pasta_dados: Path) -> None:
     """Valida a presença dos arquivos mínimos exigidos pelo dashboard.
 
@@ -70,6 +122,58 @@ def carregar_tabelas_f1(pasta_dados: Path | str) -> dict[str, pd.DataFrame]:
     return tabelas
 
 
+def _obter_finais_campeonato(
+    tabelas: dict[str, pd.DataFrame], col: dict[str, str]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Extrai a classificação final de pilotos e equipes em cada temporada."""
+    corridas = tabelas["races"][["raceId", "year", "round"]].copy()
+    ultima_rodada = corridas.groupby("year", as_index=False)["round"].max()
+    corridas_finais = corridas.merge(
+        ultima_rodada,
+        on=["year", "round"],
+        how="inner",
+    )[["raceId", "year"]]
+
+    driver_final = (
+        tabelas["driver_standings"]
+        .merge(corridas_finais, on="raceId", how="inner")
+        [["year", "driverId", "points", "position"]]
+        .rename(
+            columns={
+                "points": col["pts_campeonato_piloto"],
+                "position": col["pos_campeonato_piloto"],
+            }
+        )
+    )
+
+    constructor_final = (
+        tabelas["constructor_standings"]
+        .merge(corridas_finais, on="raceId", how="inner")
+        [["year", "constructorId", "points", "position"]]
+        .rename(
+            columns={
+                "points": col["pts_campeonato_equipe"],
+                "position": col["pos_campeonato_equipe"],
+            }
+        )
+    )
+
+    for coluna in [
+        col["pts_campeonato_piloto"],
+        col["pos_campeonato_piloto"],
+        col["pts_campeonato_equipe"],
+        col["pos_campeonato_equipe"],
+    ]:
+        if coluna in driver_final.columns:
+            driver_final[coluna] = pd.to_numeric(driver_final[coluna], errors="coerce")
+        if coluna in constructor_final.columns:
+            constructor_final[coluna] = pd.to_numeric(
+                constructor_final[coluna], errors="coerce"
+            )
+
+    return driver_final, constructor_final
+
+
 @st.cache_data
 def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
     """Monta a base analítica final consumida pela interface.
@@ -92,6 +196,7 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
     """
     tabelas = carregar_tabelas_f1(pasta_dados)
     col = obter_colunas()
+    driver_final, constructor_final = _obter_finais_campeonato(tabelas, col)
 
     results = tabelas["results"].copy()
     races = tabelas["races"].rename(
@@ -122,6 +227,8 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
         .merge(constructors, on="constructorId", how="left")
         .merge(circuits, on="circuitId", how="left")
         .merge(status, on="statusId", how="left")
+        .merge(driver_final, on=["year", "driverId"], how="left")
+        .merge(constructor_final, on=["year", "constructorId"], how="left")
     )
 
     for coluna in COLUNAS_NUMERICAS_BASE:
@@ -138,6 +245,10 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
 
     status_texto = base["finish_status"].fillna("").astype("string").str.strip()
     concluiu = status_texto.eq("Finished") | status_texto.str.startswith("+")
+    incidente = status_texto.isin(INCIDENT_STATUSES)
+    falha_mecanica = status_texto.isin(MECHANICAL_FAILURE_STATUSES)
+    outra_nao_conclusao = (~concluiu) & (~incidente) & (~falha_mecanica)
+    adversidade = incidente | falha_mecanica | outra_nao_conclusao
 
     base[col["ganho"]] = (base["grid"] - base["positionOrder"]).where(base["grid"] > 0)
     base[col["mudanca_abs"]] = (
@@ -146,6 +257,10 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
     base[col["concluiu"]] = concluiu
     base[col["abandono"]] = ~base[col["concluiu"]]
     base[col["pontuou"]] = base["points"].fillna(0) > 0
+    base[col["incidente"]] = incidente
+    base[col["falha_mecanica"]] = falha_mecanica
+    base[col["outra_nao_conclusao"]] = outra_nao_conclusao
+    base[col["adversidade"]] = adversidade
 
     base_analitica = pd.DataFrame(
         {
@@ -173,6 +288,14 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
             col["pontuou"]: base[col["pontuou"]],
             col["ganho"]: base[col["ganho"]],
             col["mudanca_abs"]: base[col["mudanca_abs"]],
+            col["incidente"]: base[col["incidente"]],
+            col["falha_mecanica"]: base[col["falha_mecanica"]],
+            col["outra_nao_conclusao"]: base[col["outra_nao_conclusao"]],
+            col["adversidade"]: base[col["adversidade"]],
+            col["pos_campeonato_piloto"]: base[col["pos_campeonato_piloto"]],
+            col["pts_campeonato_piloto"]: base[col["pts_campeonato_piloto"]],
+            col["pos_campeonato_equipe"]: base[col["pos_campeonato_equipe"]],
+            col["pts_campeonato_equipe"]: base[col["pts_campeonato_equipe"]],
         }
     )
 
@@ -189,6 +312,14 @@ def carregar_dados(pasta_dados: Path | str) -> pd.DataFrame:
     base_analitica[col["numero_piloto"]] = pd.to_numeric(
         base_analitica[col["numero_piloto"]], errors="coerce"
     )
+
+    for coluna in [
+        col["pos_campeonato_piloto"],
+        col["pts_campeonato_piloto"],
+        col["pos_campeonato_equipe"],
+        col["pts_campeonato_equipe"],
+    ]:
+        base_analitica[coluna] = pd.to_numeric(base_analitica[coluna], errors="coerce")
 
     for coluna in [col["nac_piloto"], col["nac_equipe"]]:
         base_analitica[coluna] = (
