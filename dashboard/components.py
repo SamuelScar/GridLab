@@ -19,10 +19,29 @@ RATE_COLORS = {
     "21-30%": "#55828B",
     "31%+": "#3B6064",
 }
+POSITION_BAND_COLORS = {
+    "Top 5": "#8ECAE6",
+    "Top 3": "#8ECAE6",
+    "6-10": "#006DAD",
+    "4-6": "#006DAD",
+    "11-20": "#F2A7A7",
+    "7-10": "#F2A7A7",
+    "21+": "#D62828",
+    "11+": "#D62828",
+}
+RELATION_COLOR_SCALE = [
+    (0.0, "#3E4A5C"),
+    (0.35, "#5DA9C9"),
+    (0.70, "#F2B84B"),
+    (1.0, "#FF4B4B"),
+]
 SITUATION_COLORS = {
     "Com o problema": "#C1121F",
     "Sem o problema": "#669BBC",
 }
+BUBBLE_SIZE_MIN = 1.5
+BUBBLE_SIZE_MAX = 11
+BUBBLE_SIZE_P95 = 0.95
 
 
 def media_formatada(valor: float, sufixo: str = "") -> str:
@@ -276,32 +295,78 @@ def render_cabecalho() -> None:
     )
 
 
-def render_contexto_analise(visao: str, faixa_anos: tuple[int, int]) -> None:
+def render_seletor_visao() -> str | None:
+    """Renderiza a escolha inicial entre análise de pilotos ou equipes."""
+    st.markdown(
+        """
+        <section class="analysis-choice">
+            <p class="analysis-choice__eyebrow">Visão da análise</p>
+            <h2>Escolha o foco do campeonato</h2>
+            <p class="analysis-choice__subtitle">
+                Selecione uma visão para carregar os filtros, indicadores e gráficos.
+            </p>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    return st.segmented_control(
+        "Escolha o foco principal do campeonato",
+        ["Pilotos", "Equipes"],
+        default=None,
+        format_func={
+            "Pilotos": ":material/person: Pilotos",
+            "Equipes": ":material/groups: Equipes",
+        }.get,
+        key="visao_analise",
+        label_visibility="collapsed",
+        width="stretch",
+    )
+
+
+def render_contexto_analise(
+    visao: str | None = None, faixa_anos: tuple[int, int] | None = None
+) -> None:
     """Apresenta o contexto do problema e a pergunta de pesquisa."""
-    alvo = "pilotos" if visao == "Pilotos" else "equipes"
-    st.markdown("### Contexto da análise")
+    cautela_historica = (
+        faixa_anos is not None and (faixa_anos[0] < 2010 or faixa_anos[1] > 2025)
+    )
+    nota_recorte = (
+        "Comparações históricas amplas exigem cautela: regras, pontuação e número "
+        "de corridas mudaram bastante."
+        if cautela_historica
+        else "Recorte recomendado: 2010 a 2025, quando as comparações ficam mais homogêneas."
+    )
+
     st.markdown(
-        "O foco desta análise é observar se temporadas com mais adversidades "
-        "tendem a terminar em posições piores no campeonato."
+        f"""
+        <section class="analysis-context">
+            <div class="analysis-context__intro">
+                <p class="analysis-context__eyebrow">Contexto da análise</p>
+                <h2>Adversidade e posição final no campeonato</h2>
+                <p>
+                    O dashboard observa se temporadas com incidentes, falhas e
+                    abandonos tendem a terminar em posições piores no campeonato.
+                </p>
+            </div>
+            <div class="analysis-context__facts">
+                <div class="analysis-context__fact">
+                    <span>Pergunta</span>
+                    <p>Incidentes e não conclusões estão associados à posição final?</p>
+                </div>
+                <div class="analysis-context__fact">
+                    <span>Adversidade</span>
+                    <p>Incidentes de pista, problemas mecânicos e outros abandonos.</p>
+                </div>
+                <div class="analysis-context__fact">
+                    <span>Recorte</span>
+                    <p>{nota_recorte}</p>
+                </div>
+            </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
     )
-    st.info(
-        "Pergunta de pesquisa: em que medida incidentes e não conclusões ao "
-        "longo da temporada estão associados à posição final no campeonato, e "
-        f"quais {alvo} mais superaram essas adversidades?"
-    )
-    st.markdown(
-        "**Adversidade no estudo:** incidentes de pista, problemas mecânicos e "
-        "outros abandonos."
-    )
-    if faixa_anos[0] < 2010 or faixa_anos[1] > 2025:
-        st.caption(
-            "Comparações históricas amplas exigem cautela: regras, pontuação e "
-            "número de corridas mudaram bastante ao longo do tempo."
-        )
-    else:
-        st.caption(
-            "Recorte recomendado: de 2010 a 2025 as comparações ficam mais homogêneas."
-        )
     with st.expander("Definições e cuidados metodológicos", expanded=False):
         st.markdown("**O que entra como adversidade**")
         st.markdown(
@@ -605,72 +670,128 @@ def render_graficos(base_temporada: pd.DataFrame, visao: str) -> None:
             )
 
 
-def render_relacionamento_dinamico(base_temporada: pd.DataFrame, visao: str) -> None:
-    """Renderiza uma tabela-resumo dinâmica sobre temporadas."""
-    st.markdown("### Relacionamento dinâmico")
-    st.caption(
-        "Resumo personalizado da base por temporada para apoiar a interpretação "
-        "dos gráficos principais."
+def _adicionar_resultado_visual(dados: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Cria um eixo visual em que valores maiores representam melhor resultado."""
+    analisado = dados.copy()
+    analisado["Temporada"] = (
+        analisado["Entidade"] + " (" + analisado["Ano"].astype(int).astype(str) + ")"
     )
-    if base_temporada.empty:
-        st.info("Ajuste os filtros para gerar a análise dinâmica.")
+    analisado["Relação adversidade/posição"] = (
+        analisado["Taxa de adversidade (%)"] / analisado["Posição final no campeonato"]
+    )
+    relacao_suavizada = analisado["Relação adversidade/posição"].pow(0.5)
+    limite_superior = relacao_suavizada.quantile(BUBBLE_SIZE_P95)
+    if pd.isna(limite_superior) or limite_superior <= 0:
+        analisado["Tamanho visual da bolha"] = BUBBLE_SIZE_MIN
+        analisado["Intensidade da relação (%)"] = 0.0
+    else:
+        relacao_limitada = relacao_suavizada.clip(upper=limite_superior)
+        maximo = relacao_limitada.max()
+        if pd.isna(maximo) or maximo <= 0:
+            analisado["Tamanho visual da bolha"] = BUBBLE_SIZE_MIN
+            analisado["Intensidade da relação (%)"] = 0.0
+        else:
+            analisado["Tamanho visual da bolha"] = (
+                BUBBLE_SIZE_MIN
+                + (relacao_limitada / maximo)
+                * (BUBBLE_SIZE_MAX - BUBBLE_SIZE_MIN)
+            )
+            analisado["Intensidade da relação (%)"] = relacao_limitada / maximo * 100
+    pior_posicao = int(analisado["Posição final no campeonato"].max())
+    analisado["Resultado final visual"] = (
+        pior_posicao + 1 - analisado["Posição final no campeonato"]
+    )
+    return analisado, pior_posicao
+
+
+def _ticks_resultado_visual(pior_posicao: int) -> tuple[list[float], list[str]]:
+    """Monta rótulos do eixo visual usando a posição real no campeonato."""
+    candidatos = [1, 3, 5, 10, 15, 20, 25, 30]
+    posicoes = [pos for pos in candidatos if pos <= pior_posicao]
+    if pior_posicao not in posicoes:
+        posicoes.append(pior_posicao)
+
+    ticks = [
+        (pior_posicao + 1 - posicao, f"{posicao}º" + (" (melhor)" if posicao == 1 else ""))
+        for posicao in sorted(set(posicoes))
+    ]
+    ticks_ordenados = sorted(ticks, key=lambda item: item[0])
+    return [valor for valor, _ in ticks_ordenados], [rotulo for _, rotulo in ticks_ordenados]
+
+
+def render_relacionamento_dinamico(base_temporada: pd.DataFrame, visao: str) -> None:
+    """Renderiza uma análise direcionada da relação adversidade x resultado."""
+    entidade_label = "pilotos" if visao == "Pilotos" else "equipes"
+    st.markdown("### Adversidade x resultado")
+    st.caption(
+        "Cada ponto representa uma temporada. A leitura principal é simples: "
+        "quanto mais à direita, maior foi a taxa de adversidade; quanto mais alto, "
+        "melhor foi o resultado final no campeonato."
+    )
+    st.caption(
+        "A relação usada no tamanho e na cor das bolhas é: taxa de adversidade "
+        "dividida pela posição final. Ela fica maior quando uma temporada combina "
+        "muita adversidade com uma boa colocação no campeonato."
+    )
+
+    dados = base_temporada.dropna(
+        subset=["Taxa de adversidade (%)", "Posição final no campeonato"]
+    ).copy()
+    if dados.empty:
+        st.info("Ajuste os filtros para gerar a análise de associação.")
         return
 
-    dados = base_temporada.copy()
-    dados["Terminou no topo"] = dados["Terminou no topo"].map(
-        {True: "Sim", False: "Não"}
+    dados, pior_posicao = _adicionar_resultado_visual(dados)
+    y_ticks, y_tick_labels = _ticks_resultado_visual(pior_posicao)
+    fig = px.scatter(
+        dados,
+        x="Taxa de adversidade (%)",
+        y="Resultado final visual",
+        size="Tamanho visual da bolha",
+        color="Intensidade da relação (%)",
+        color_continuous_scale=RELATION_COLOR_SCALE,
+        hover_name="Temporada",
+        hover_data={
+            "Resultado final visual": False,
+            "Ano": True,
+            "Entidade": False,
+            "Faixa de posição final": True,
+            "Posição final no campeonato": ":.0f",
+            "Pontos finais na temporada": ":.1f",
+            "Adversidades": True,
+            "Incidentes": True,
+            "Falhas mecânicas": True,
+            "Outras não conclusões": True,
+            "Relação adversidade/posição": ":.2f",
+            "Tamanho visual da bolha": False,
+            "Intensidade da relação (%)": False,
+        },
+        title=f"Adversidade e resultado final por temporada ({entidade_label})",
+        size_max=BUBBLE_SIZE_MAX,
+        opacity=0.78,
     )
-
-    opcoes_categoricas = [
-        "Ano",
-        "Entidade",
-        "Faixa de posição final",
-        "Faixa de taxa de adversidade",
-        "Terminou no topo",
-    ]
-    opcoes_numericas = [
-        "Pontos finais na temporada",
-        "Posição final no campeonato",
-        "Adversidades",
-        "Incidentes",
-        "Falhas mecânicas",
-        "Outras não conclusões",
-        "Taxa de adversidade (%)",
-    ]
-    opcoes_metricas = {
-        "Média": "mean",
-        "Mediana": "median",
-        "Soma": "sum",
-        "Mínimo": "min",
-        "Máximo": "max",
-        "Desvio padrão": "std",
-        "Contagem": "count",
-    }
-
-    res1, res2, res3 = st.columns(3, gap="medium")
-    agrupador = res1.selectbox("Agrupar por", opcoes_categoricas)
-    numerica = res2.selectbox("Calcular sobre", opcoes_numericas)
-    metrica_rotulo = res3.selectbox("Operação", list(opcoes_metricas.keys()))
-
-    res4, res5 = st.columns(2, gap="medium")
-    ordem = res4.selectbox("Ordenar", ["Decrescente", "Crescente"])
-    limite = res5.slider(
-        "Quantidade de linhas",
-        min_value=10,
-        max_value=100,
-        value=30,
-        step=10,
+    fig.update_layout(
+        coloraxis_colorbar=dict(
+            title="Adversidade<br>com boa<br>posição",
+            tickvals=[0, 50, 100],
+            ticktext=["Baixo", "Médio", "Alto"],
+        )
     )
-
-    nome_coluna_saida = f"{metrica_rotulo} de {numerica}"
-    resumo = (
-        dados.groupby(agrupador, as_index=False)[numerica]
-        .agg(opcoes_metricas[metrica_rotulo])
-        .rename(columns={numerica: nome_coluna_saida})
-        .sort_values(by=nome_coluna_saida, ascending=(ordem == "Crescente"))
-        .head(limite)
+    fig.update_xaxes(title="Taxa de adversidade na temporada (%)")
+    fig.update_yaxes(
+        title="Resultado final (mais alto = melhor)",
+        tickmode="array",
+        tickvals=y_ticks,
+        ticktext=y_tick_labels,
+        range=[0.4, pior_posicao + 1.8],
     )
-    st.dataframe(resumo.round(2), width="stretch", hide_index=True)
+    st.plotly_chart(ajustar_figura(fig), width="stretch")
+    st.caption(
+        "Bolhas maiores e cores mais fortes indicam maior taxa de adversidade em "
+        "relação à posição final. A cor é uma escala relativa do recorte atual: "
+        "baixo, médio ou alto destaque para temporadas que combinaram muita "
+        "adversidade com bom resultado no campeonato."
+    )
 
 
 def render_dados_filtrados(base_temporada: pd.DataFrame, visao: str) -> None:

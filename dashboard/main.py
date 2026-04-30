@@ -16,6 +16,7 @@ from dashboard.components import (
     render_graficos,
     render_kpis,
     render_relacionamento_dinamico,
+    render_seletor_visao,
 )
 from dashboard.config import CSS_PERSONALIZADO, DATA_DIR, obter_colunas
 from dashboard.data import carregar_dados
@@ -48,6 +49,11 @@ def main() -> None:
     """
     configurar_pagina()
     render_cabecalho()
+    render_contexto_analise()
+
+    visao = render_seletor_visao()
+    if visao is None:
+        st.stop()
 
     try:
         df = carregar_dados(DATA_DIR)
@@ -59,32 +65,15 @@ def main() -> None:
     filtros = construir_filtros(df, col)
     df_filtrado = aplicar_filtros(df, col, filtros)
 
-    st.markdown("### Visão da análise")
-    visao = st.radio(
-        "Escolha o foco principal do campeonato",
-        ["Pilotos", "Equipes"],
-        horizontal=True,
-        label_visibility="collapsed",
-    )
     base_temporada = montar_base_temporada(df_filtrado, col, visao)
     base_temporada = filtrar_base_temporada(base_temporada, filtros, visao)
     base_principal = preparar_base_principal(base_temporada, visao)
 
-    aba_principal, aba_relacoes = st.tabs(
-        ["Visão principal", "Relacionamento dinâmico"]
-    )
-
-    with aba_principal:
-        render_contexto_analise(visao, filtros["faixa_anos"])
-        if base_principal.empty:
-            st.warning("Nenhum registro encontrado com os filtros atuais.")
-        else:
-            render_kpis(base_principal, visao)
-            render_graficos(base_principal, visao)
-            render_dados_filtrados(base_principal, visao)
-
-    with aba_relacoes:
-        if base_principal.empty:
-            st.info("Ajuste os filtros para gerar a análise dinâmica.")
-        else:
-            render_relacionamento_dinamico(base_principal, visao)
+    if base_principal.empty:
+        st.warning("Nenhum registro encontrado com os filtros atuais.")
+    else:
+        render_kpis(base_principal, visao)
+        render_graficos(base_principal, visao)
+        st.divider()
+        render_relacionamento_dinamico(base_principal, visao)
+        render_dados_filtrados(base_principal, visao)
